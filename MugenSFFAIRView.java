@@ -347,7 +347,8 @@ public class MugenSFFAIRView extends JFrame
 			SFFImgArray[ind].Palette = _pal;
 			
 		}
-		int byteptr = 0;
+		int byteptr = 0; //raw byte pointer
+		int ubyteptr = 0; //uncompressed byte pointer
 		int imgptr = 0; //added pixel count
 		int rl = -1; //runlength, -1 if there is no runlength bit
 		SFFImgArray[ind].ImgContent = new byte[imgwidth * imgheight];
@@ -359,7 +360,7 @@ public class MugenSFFAIRView extends JFrame
 				if(rl == -1) {rl = 1;}
 				//add pixel for rl times
 				for(int i = 0; i < rl; i++) {
-					int ix = (imgptr + i) % nscanline;
+					int ix = ubyteptr % nscanline;
 					if(ix < imgwidth) {
 						byte t;
 						//convert int16_t to int8_t
@@ -371,6 +372,7 @@ public class MugenSFFAIRView extends JFrame
 						SFFImgArray[ind].ImgContent[imgptr] = t;
 						imgptr++;
 					}
+					ubyteptr++;
 				}
 				rl = -1;
 			} else {
@@ -456,7 +458,11 @@ public class MugenSFFAIRView extends JFrame
 	 * Add animation descriptor to AIRAnimationDescs
 	 * @param e data
 	 */
-	public void AppendAnimation(AIRElement e) {
+	public void AppendAnimation(AIRElement e) throws IllegalArgumentException {
+		//Check if there is illegal Loopstart
+		if(e.LoopstartNum >= e.Elements.length) {
+			throw new IllegalArgumentException("Bad loopstart!");
+		}
 		//Expand and append element to array
 		AIRElement n[] = new AIRElement[AIRAnimationDescs.length + 1];
 		System.arraycopy(AIRAnimationDescs, 0, n, 0, AIRAnimationDescs.length);
@@ -515,6 +521,12 @@ public class MugenSFFAIRView extends JFrame
 					 Loopstart statement will define animation's loop start
 					 point from 2nd loop.
 					 */
+					if(anim != null) {
+						anim.LoopstartNum = anim.Elements.length;
+					} else {
+						final String desc = "Animation number undefined.";
+						throw new IllegalArgumentException(desc);
+					}
 				} else if(line.startsWith("clsn1") || 
 						line.startsWith("clsn2") || 
 						line.startsWith("clsn1Default") || 
@@ -750,10 +762,19 @@ public class MugenSFFAIRView extends JFrame
 		int r = _findimg(es.GroupNo, es.ImageNo);
 		if(r != -1) {
 			SelectedImageIndex = r;
+		} else {
+			//If image that specified animation element was not found
+			//stop and show error.
+			stopAnimation();
+			ErrorDialogue(
+					String.format("Can not find image having GroupNo %d " + 
+							"and ImageNo %d. Animation will halt.", 
+							es.GroupNo, es.ImageNo) );
 		}
 		//Wait for time specified in Disptime
 		//(Show same image until Disptime elapses)
-		FrameTimer++;
+		//If display time is -1, it means 'stay'
+		if(es.DispTime != -1) { FrameTimer++; }
 		if(FrameTimer >= es.DispTime) {
 			FrameTimer = 0;
 			CurrentFrame++;
@@ -789,7 +810,7 @@ public class MugenSFFAIRView extends JFrame
 				//Draw image information
 				G.drawString(String.format("Group%d Image%d %dx%d (%d/%d)",
 						e.GroupNo, e.ImageNo, e.X, e.Y,
-						SelectedImageIndex, SFFImgArray.length), 0, 10);
+						SelectedImageIndex + 1, SFFImgArray.length), 0, 10);
 			} else {
 				//Draw image information
 				G.drawString(String.format("%d image loaded.",
@@ -802,18 +823,21 @@ public class MugenSFFAIRView extends JFrame
 				AIRElement e = AIRAnimationDescs[SelectedAnimIndex];
 				//If animation is playing
 				G.drawString(
-						String.format("Playing animation%d (%d/%d) Frame%d", 
+						String.format("Playing animation%d Frame%d/%d", 
 								e.AnimationNumber,
-								SelectedAnimIndex,
-								AIRAnimationDescs.length,
-								CurrentFrame),
+								CurrentFrame + 1,
+								e.Elements.length),
 						0, 20);
 			} else {
 				//Draw animation information
 				G.drawString(String.format("%d animations loaded.",
 					AIRAnimationDescs.length), 0, 20);
 			}
-			
+			G.drawString(
+					String.format("Selecting Animation%d by slider (%d/%d)",
+					AIRAnimationDescs[SAnimNo.getValue()].AnimationNumber,
+					SAnimNo.getValue() + 1,
+					AIRAnimationDescs.length), 0, 30);
 		}
 		PicBox.repaint();
 	}
@@ -842,7 +866,7 @@ public class MugenSFFAIRView extends JFrame
 	
 	//Image index slider state changed callback
 	public void stateChanged(ChangeEvent e) {
-		TMAnim.stop(); //Stop animation
+		stopAnimation();
 		if(SFFImgArray == null) {
 			SelectedImageIndex = -1;
 		} else {
