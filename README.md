@@ -6,6 +6,7 @@ This is for checking sff and air in java swing.
 - Background colour changer
 - Process Loopstart correctly
 - Process ClsnX
+- Process blending options and flip options (H, V, A1...)
 
 # License
 Copyright (C) 2023 kumohakase (license: https://creativecommons.org/licenses/by-nc/4.0/)   
