@@ -2,9 +2,7 @@
 This is for checking sff and air in java swing.   
 
 # TODO
-- Fix sff reader issue (load failure to some sff, pcx decode failed)
 - Background colour changer
-- Process Loopstart correctly
 - Process ClsnX
 - Process blending options and flip options (H, V, A1...)
 
